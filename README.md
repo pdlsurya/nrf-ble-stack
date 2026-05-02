@@ -1,6 +1,6 @@
 # nrf-ble-stack
 
-Minimal BLE stack for nRF SoCs.
+Minimal BLE stack for nRF52 series SoCs.
 
 This repository contains a compact educational BLE stack focused on clarity,
 small code size, and readable control flow. It implements the pieces needed for
@@ -11,12 +11,16 @@ callbacks, automatic central link-layer feature exchange, automatic central
 data length and PHY updates, delayed peripheral connection parameter update
 requests, and application-driven MTU and connection parameter procedures.
 
+The current implementation targets nRF52-series RADIO behavior and timing.
+nRF51 compatibility is not implemented yet.
+
 The stack is intentionally small enough to read end to end. Public API,
 controller logic, ATT/GATT handling, and radio access are kept in separate
 layers so packet flow is easy to follow in code.
 
 ## Current Scope
 
+- nRF52 series support only
 - Peripheral and central role support
 - One role active at a time
 - Advertising with configurable name, flags, TX power, interval, and one
@@ -344,6 +348,7 @@ The normal stack flow is:
 
 ## Limitations
 
+- nRF51 support is not implemented yet
 - No simultaneous multi-role support; the stack runs as either peripheral or
   central at one time
 - `TIMER0` is reserved by the controller for connection timing and radio-anchor

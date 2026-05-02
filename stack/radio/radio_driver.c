@@ -101,7 +101,9 @@ static void radio_set_mode(radio_mode_t mode)
 
 void radio_tx_then_rx(uint32_t tx_packet_ptr, uint32_t rx_packet_ptr)
 {
-    // Start in TX, then hand PACKETPTR over to RX before the TX->RX shortcut fires.
+    /* PACKETPTR is sampled when START executes, not when TXEN/RXEN is armed.
+       Start TX with tx_packet_ptr, then repoint PACKETPTR to rx_packet_ptr so
+       the DISABLED->RXEN turnaround receives into the RX buffer. */
     radio_set_shorts(0U);
     if (radio_get_state() != TX_IDLE)
     {

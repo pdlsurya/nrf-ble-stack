@@ -1014,7 +1014,7 @@ void controller_runtime_init(void)
     controller_central_scan_timers_init();
 
     radio_power_on();
-    radio_configure_modecnf0(RADIO_RAMP_UP_DEFAULT, RADIO_DEFAULT_TX_B1);
+    radio_configure_modecnf0(RADIO_RAMP_UP_FAST, RADIO_DEFAULT_TX_B1);
     radio_set_tifs(150U);
     controller_conn_timer_init();
     radio_set_event_handler(radio_evt_handler);

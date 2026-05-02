@@ -88,9 +88,42 @@ typedef struct
 
 typedef void (*ble_gatt_server_evt_handler_t)(const ble_gatt_server_evt_t *p_evt);
 
+/**
+ * @brief Register the stack-wide GATT server event callback.
+ *
+ * @param[in] handler Application callback for server events.
+ */
 void ble_gatt_server_register_evt_handler(ble_gatt_server_evt_handler_t handler);
+
+/**
+ * @brief Build the local ATT database from the supplied services and characteristics.
+ *
+ * @param[in,out] p_services Array of service definitions to register.
+ * @param[in] service_count Number of services in @p p_services.
+ *
+ * @retval true The database was built successfully.
+ * @retval false The database could not be built.
+ */
 bool ble_gatt_server_init(ble_gatt_service_t *p_services, uint8_t service_count);
+
+/**
+ * @brief Queue a notification for the selected characteristic value.
+ *
+ * @param[in] p_characteristic Characteristic whose current value should be notified.
+ *
+ * @retval true The notification was queued.
+ * @retval false The notification could not be queued.
+ */
 bool ble_gatt_server_notify_characteristic(const ble_gatt_characteristic_t *p_characteristic);
+
+/**
+ * @brief Queue an indication for the selected characteristic value.
+ *
+ * @param[in] p_characteristic Characteristic whose current value should be indicated.
+ *
+ * @retval true The indication was queued.
+ * @retval false The indication could not be queued.
+ */
 bool ble_gatt_server_indicate_characteristic(const ble_gatt_characteristic_t *p_characteristic);
 
 #endif /* BLE_GATT_SERVER_H__ */

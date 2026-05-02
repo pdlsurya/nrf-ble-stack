@@ -42,6 +42,11 @@ typedef struct
 #define BLE_UUID_VENDOR16_INIT(v)  { .type = BLE_UUID_TYPE_VENDOR_16, .value.uuid16 = (v) }
 #define BLE_UUID_RAW128_INIT(...)  { .type = BLE_UUID_TYPE_RAW_128, .value.uuid128 = { __VA_ARGS__ } }
 
+/**
+ * @brief Register the base 128-bit UUID used to expand vendor 16-bit UUIDs.
+ *
+ * @param[in] uuid128 Vendor base UUID in little-endian byte order.
+ */
 void ble_uuid_set_vendor_base(const uint8_t uuid128[BLE_UUID128_LEN]);
 
 #endif /* BLE_UUID_H__ */

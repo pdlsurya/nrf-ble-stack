@@ -748,9 +748,15 @@ void controller_central_start_connection_event(void)
 
     radio_enable_interrupt_mask(BLE_RADIO_IRQ_MASK_CONN);
     radio_set_bcc(BLE_LL_DATA_HEADER_BITS);
-    radio_set_shorts(RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk);
+
     controller_stage_conn_response(new_tx_pdu);
     controller_set_mode_with_phy(RADIO_MODE_TX, m_link.phy.tx_phy);
+    radio_set_shorts(RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk | RADIO_SHORTS_READY_START_Msk);
+    radio_start();
+    /* PACKETPTR is latched when START executes, so updating it immediately after
+       launching TX does not disturb the TX packet and prepares the upcoming
+       DISABLED->RXEN turnaround to receive into conn_rx_pdu. */
+    radio_set_packet_ptr((uint32_t)&m_ctrl_rt.conn_rx_pdu);
 }
 
 void radio_handle_connected_packet_central(void)
@@ -791,10 +797,9 @@ void controller_central_handle_connected_disabled(void)
 
     if (m_ctrl_rt.conn_radio_phase == BLE_CONN_RADIO_PHASE_WAIT_TX_DISABLED)
     {
-        m_ctrl_rt.conn_radio_phase = BLE_CONN_RADIO_PHASE_WAIT_RX_DISABLED;
-        radio_set_packet_ptr((uint32_t)&m_ctrl_rt.conn_rx_pdu);
         radio_set_shorts(RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk);
-        radio_rx_enable();
+        m_ctrl_rt.conn_radio_phase = BLE_CONN_RADIO_PHASE_WAIT_RX_DISABLED;
+
         return;
     }
 
