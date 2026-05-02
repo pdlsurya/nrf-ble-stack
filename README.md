@@ -276,7 +276,10 @@ int main(void)
 
 ## Runtime Flow Summary
 
-The normal stack flow is:
+The stack has a shared initialization path and then diverges into peripheral or
+central runtime flow depending on the configured role.
+
+Common setup:
 
 1. `ble_stack_init()` brings up shared state, deferred events, controller
    runtime, and GATT client state.
@@ -286,39 +289,56 @@ The normal stack flow is:
    later be requested by the stack.
 4. `ble_uuid_set_vendor_base()` stores the one custom 128-bit base UUID used by
    vendor 16-bit UUIDs.
-5. `ble_gap_adv_init()` stores advertising parameters.
-6. `ble_gatt_server_init()` builds the ATT database from the application's
+5. Each connection interval is handled as one RX and one TX exchange. Any ATT
+   response, notification, or signaling PDU generated from the received packet
+   is queued for the next connection event.
+6. Stack-level BLE events and characteristic callbacks are delivered later
+   from `SWI1_EGU1_IRQHandler()`.
+
+Peripheral flow:
+
+1. `ble_gap_adv_init()` stores advertising parameters.
+2. `ble_gatt_server_init()` builds the ATT database from the application's
    service table.
-7. `ble_gap_start_advertising()` starts repeated advertising events on channels 37,
-   38, and 39.
-8. After each advertising transmission, the controller opens a short RX window
+3. `ble_gap_start_advertising()` starts repeated advertising events on channels
+   37, 38, and 39.
+4. After each advertising transmission, the controller opens a short RX window
    and listens for a targeted `SCAN_REQ` or `CONNECT_REQ`.
-9. When a valid `SCAN_REQ` is received, the controller sends a minimal
+5. When a valid `SCAN_REQ` is received, the controller sends a minimal
    `SCAN_RSP` that carries the advertiser address so active scanners can keep
    the advertising event visible without adding extra payload turnaround work.
-10. When a `CONNECT_REQ` that targets the local advertiser address and address
-    type is received, the controller switches to connected mode, starts
-    connection-event timing with `TIMER0`, and begins using the data channel
-    map from the request.
-11. When the stack is acting as the central, it automatically sequences LL
-    feature exchange, data length update, and a `1M | 2M` PHY request as soon
-    as the link is established.
-12. If the peer performs the LL length or LL PHY procedures on its own, the
-    controller still updates the negotiated packet length or scheduled PHY
-    state and reports the resulting GAP events.
-13. When preferred peripheral connection parameters are configured, the stack
-    also starts a one-shot delayed L2CAP Connection Parameter Update Request
-    after connect.
-14. ATT MTU exchange and explicit connection parameter update APIs remain
-    available through the public GATT and GAP interfaces.
-15. Applications can start GATT discovery immediately after
-    `BLE_GAP_EVT_CONNECTED` when acting as the central; the controller keeps
-    automatic central LL control traffic ahead of queued ATT/L2CAP payloads.
-16. Each connection interval is handled as one RX and one TX exchange. Any ATT
-    response, notification, or signaling PDU generated from the received packet
-    is queued for the next connection event.
-17. Stack-level BLE events and characteristic callbacks are delivered later
-    from `SWI1_EGU1_IRQHandler()`.
+6. When a `CONNECT_REQ` that targets the local advertiser address and address
+   type is received, the controller switches to connected mode, starts
+   connection-event timing with `TIMER0`, and begins using the data channel
+   map from the request.
+7. When preferred peripheral connection parameters are configured, the stack
+   starts a one-shot delayed L2CAP Connection Parameter Update Request after
+   connect.
+8. ATT MTU exchange, notifications, indications, and explicit peripheral
+   connection parameter update APIs remain available through the public GATT
+   and GAP interfaces.
+
+Central flow:
+
+1. `ble_gap_scan_init()` stores scan interval and window parameters.
+2. Optional `ble_gap_set_scan_filter()` configuration tells the controller
+   which peer address, name, or service UUID should trigger auto-connect.
+3. `ble_gap_start_scanning()` starts passive scanning on channels 37, 38, and
+   39 and reports advertisements through the registered scan-report callback.
+4. If the app calls `ble_gap_connect()` or a scan filter matches a connectable
+   advertisement, the controller builds and transmits a legacy connect request
+   and then switches to connected mode.
+5. Once connected, the central automatically sequences LL feature exchange,
+   data length update, and a `1M | 2M` PHY request.
+6. If the peer performs the LL length or LL PHY procedures on its own, the
+   controller still updates the negotiated packet length or scheduled PHY state
+   and reports the resulting GAP events.
+7. Applications can start ATT MTU exchange and GATT discovery immediately
+   after `BLE_GAP_EVT_CONNECTED`; automatic central LL control traffic stays
+   ahead of queued ATT/L2CAP payloads.
+8. Central-side GATT client procedures then drive service discovery,
+   characteristic discovery, descriptor discovery, reads, writes, and CCCD
+   updates.
 
 ## Design Notes
 
