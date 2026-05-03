@@ -331,7 +331,7 @@ void controller_peripheral_start_connection_event(void)
     m_ctrl_rt.conn.conn_rx_process_pending = false;
     controller_peripheral_reset_conn_bcmatch_state();
     m_ctrl_rt.conn.conn_radio_phase = BLE_CONN_RADIO_PHASE_WAIT_RX_DISABLED;
-    radio_enable_interrupt_mask(BLE_RADIO_IRQ_MASK_CONN);
+    radio_enable_interrupt_mask(BLE_RADIO_IRQ_MASK_CONN_PERIPHERAL);
     radio_set_bcc(BLE_LL_DATA_HEADER_BITS);
     radio_set_shorts(RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_ADDRESS_BCSTART_Msk | RADIO_SHORTS_DISABLED_TXEN_Msk);
     radio_set_packet_ptr((uint32_t)&m_ctrl_rt.conn.conn_rx_pdu);

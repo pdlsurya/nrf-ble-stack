@@ -924,9 +924,7 @@ void controller_central_start_connection_event(void)
         }
     }
 
-    radio_enable_interrupt_mask(BLE_RADIO_IRQ_MASK_CONN);
-    radio_set_bcc(BLE_LL_DATA_HEADER_BITS);
-
+    radio_enable_interrupt_mask(BLE_RADIO_IRQ_MASK_CONN_CENTRAL);
     controller_stage_conn_response(new_tx_pdu);
     controller_set_mode_with_phy(RADIO_MODE_TX, m_link.phy.tx_phy);
     radio_set_shorts(RADIO_SHORTS_END_DISABLE_Msk | RADIO_SHORTS_DISABLED_RXEN_Msk | RADIO_SHORTS_READY_START_Msk);
