@@ -135,7 +135,11 @@ uint32_t controller_conn_next_event_tick_from_anchor(uint32_t current_event_tick
         next_event_tick_us = current_event_tick_us + m_link.conn.conn_interval_us;
         m_link.pending_conn_update.valid = false;
         m_link.supervision.missed_interval_count = 0U;
-        controller_central_handle_conn_update_instant_complete();
+        if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+        {
+            controller_central_handle_conn_update_instant_complete();
+        }
+        (void)ble_evt_notify_gap(BLE_GAP_EVT_CONN_UPDATE_IND);
     }
 
     return next_event_tick_us;
@@ -453,9 +457,13 @@ bool controller_load_pending_conn_tx_pdu_for_state(uint8_t next_expected_rx_sn, 
 void controller_disconnect_internal(void)
 {
     bool was_connected = m_link.connected;
+    ble_gap_role_t old_role = m_link.role;
 
-    controller_central_scan_timer_stop();
-    controller_central_scan_window_timer_stop();
+    if (old_role == BLE_GAP_ROLE_CENTRAL)
+    {
+        controller_central_scan_timer_stop();
+        controller_central_scan_window_timer_stop();
+    }
     m_link.connected = false;
     m_link.role = BLE_GAP_ROLE_NONE;
     m_link.peer_addr = (ble_gap_addr_t){0};
@@ -475,8 +483,14 @@ void controller_disconnect_internal(void)
     ble_gatt_server_reset_connection_state();
     ble_gatt_client_reset_connection_state();
     radio_disable();
-    controller_peripheral_state_reset();
-    controller_central_state_reset();
+    if (old_role == BLE_GAP_ROLE_CENTRAL)
+    {
+        controller_central_state_reset();
+    }
+    else if (old_role == BLE_GAP_ROLE_PERIPHERAL)
+    {
+        controller_peripheral_state_reset();
+    }
     radio_enable_interrupt_mask(0U);
 
     if (was_connected)
@@ -513,14 +527,22 @@ static uint16_t ll_control_process(const uint8_t *p_payload, uint8_t len, uint8_
     case BLE_LL_CTRL_FEATURE_REQ:
     case BLE_LL_CTRL_SLV_FEATURE_REQ:
         controller_store_peer_features(p_payload, len);
-        controller_central_handle_feature_exchange_complete();
+        if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+        {
+            controller_central_handle_feature_exchange_complete();
+        }
+        (void)ble_evt_notify_gap(BLE_GAP_EVT_FEATURE_EXCHANGED);
         p_rsp[0] = BLE_LL_CTRL_FEATURE_RSP;
         controller_local_features_fill(&p_rsp[1]);
         return 9U;
 
     case BLE_LL_CTRL_FEATURE_RSP:
         controller_store_peer_features(p_payload, len);
-        controller_central_handle_feature_exchange_complete();
+        if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+        {
+            controller_central_handle_feature_exchange_complete();
+        }
+        (void)ble_evt_notify_gap(BLE_GAP_EVT_FEATURE_EXCHANGED);
         return 0U;
 
     case BLE_LL_CTRL_VERSION_IND:
@@ -537,7 +559,10 @@ static uint16_t ll_control_process(const uint8_t *p_payload, uint8_t len, uint8_
                                          u16_decode(&p_payload[3]),
                                          u16_decode(&p_payload[5]),
                                          u16_decode(&p_payload[7]));
-            controller_central_handle_data_length_update_complete();
+            if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+            {
+                controller_central_handle_data_length_update_complete();
+            }
         }
         p_rsp[0] = BLE_LL_CTRL_LENGTH_RSP;
         u16_encode(BLE_LL_DATA_LEN_MAX_OCTETS, &p_rsp[1]);
@@ -553,7 +578,10 @@ static uint16_t ll_control_process(const uint8_t *p_payload, uint8_t len, uint8_
                                          u16_decode(&p_payload[3]),
                                          u16_decode(&p_payload[5]),
                                          u16_decode(&p_payload[7]));
-            controller_central_handle_data_length_update_complete();
+            if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+            {
+                controller_central_handle_data_length_update_complete();
+            }
         }
         return 0U;
 
@@ -568,14 +596,18 @@ static uint16_t ll_control_process(const uint8_t *p_payload, uint8_t len, uint8_
     }
 
     case BLE_LL_CTRL_PHY_RSP:
-        return controller_central_process_phy_rsp(p_payload, len, p_rsp);
+        if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+        {
+            return controller_central_process_phy_rsp(p_payload, len, p_rsp);
+        }
+        return 0U;
 
     case BLE_LL_CTRL_PHY_UPDATE_IND:
         controller_schedule_phy_update(p_payload, len);
         return 0U;
 
     case BLE_LL_CTRL_UNKNOWN_RSP:
-        if (len >= 2U)
+        if ((m_link.role == BLE_GAP_ROLE_CENTRAL) && (len >= 2U))
         {
             controller_central_handle_unknown_rsp(p_payload[1]);
         }
@@ -727,7 +759,11 @@ void TIMER0_IRQHandler(void)
     {
         m_link.phy = m_link.pending_phy_update.phy;
         m_link.pending_phy_update.valid = false;
-        controller_central_handle_phy_update_instant_complete();
+        if (m_link.role == BLE_GAP_ROLE_CENTRAL)
+        {
+            controller_central_handle_phy_update_instant_complete();
+        }
+        (void)ble_evt_notify_gap(BLE_GAP_EVT_PHY_UPDATE_IND);
     }
 
     if (m_link.role == BLE_GAP_ROLE_CENTRAL)
@@ -788,8 +824,14 @@ void controller_prepare_connected_link(const ble_connect_req_pdu_t *p_req,
     controller_l2cap_tx_queue_reset();
     m_ctrl_rt.conn.conn_rx_process_pending = false;
     m_ctrl_rt.conn.conn_radio_phase = BLE_CONN_RADIO_PHASE_IDLE;
-    controller_central_state_reset();
-    controller_peripheral_state_reset();
+    if (role == BLE_GAP_ROLE_CENTRAL)
+    {
+        controller_central_state_reset();
+    }
+    else
+    {
+        controller_peripheral_state_reset();
+    }
     controller_reset_conn_tx_selection_state();
     ble_gatt_server_reset_connection_state();
     ble_gatt_client_reset_connection_state();
@@ -813,12 +855,13 @@ void controller_prepare_connected_link(const ble_connect_req_pdu_t *p_req,
 static void radio_evt_handler(radio_event_t evt)
 {
     const ble_adv_rx_pdu_t *p_adv_rx = &m_ctrl_rt.peripheral.adv_rx_pdu;
-    const ble_adv_rx_pdu_t *p_scan_rx = &m_ctrl_rt.central.scan_rx_pdu;
 
     if (m_link.connected)
     {
         if (m_link.role == BLE_GAP_ROLE_CENTRAL)
         {
+            const ble_adv_rx_pdu_t *p_scan_rx = &m_ctrl_rt.central.scan_rx_pdu;
+
             controller_central_handle_radio_event(evt, p_scan_rx);
         }
         else
@@ -834,8 +877,11 @@ static void radio_evt_handler(radio_event_t evt)
         return;
     }
 
-    if (m_ctrl_rt.central.scan_radio_phase != BLE_SCAN_RADIO_PHASE_IDLE)
+    if ((m_host.configured_role == BLE_GAP_ROLE_CENTRAL) &&
+        (m_ctrl_rt.central.scan_radio_phase != BLE_SCAN_RADIO_PHASE_IDLE))
     {
+        const ble_adv_rx_pdu_t *p_scan_rx = &m_ctrl_rt.central.scan_rx_pdu;
+
         controller_central_handle_radio_event(evt, p_scan_rx);
     }
 }

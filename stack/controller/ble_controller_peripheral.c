@@ -313,7 +313,6 @@ static void controller_peripheral_apply_connect_request(const ble_connect_req_pd
     uint32_t first_event_delay_us;
 
     (void)memcpy(peer_addr.addr, p_req->initiator_address, sizeof(peer_addr.addr));
-    controller_central_scan_timer_stop();
     controller_peripheral_adv_timer_stop();
     controller_prepare_connected_link(p_req, BLE_GAP_ROLE_PERIPHERAL, &peer_addr);
 
@@ -524,7 +523,6 @@ void controller_peripheral_start_advertising_internal(void)
         return;
     }
 
-    controller_central_stop_scanning_internal();
     radio_enable_interrupt_mask(BLE_RADIO_IRQ_MASK_ADV);
 
     controller_prepare_radio_common((uint8_t)sizeof(m_ctrl_rt.peripheral.adv_tx_pdu.payload),

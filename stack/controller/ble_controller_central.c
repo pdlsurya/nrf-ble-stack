@@ -48,18 +48,27 @@ void controller_central_state_reset(void)
 
 void controller_central_handle_feature_exchange_complete(void)
 {
+    if (m_link.role != BLE_GAP_ROLE_CENTRAL)
+    {
+        return;
+    }
+
     if ((m_ctrl_rt.central.central_ctrl_proc.procedure == BLE_GAP_CTRL_PROC_FEATURE_EXCHANGE) &&
         (m_ctrl_rt.central.central_ctrl_proc.state == BLE_CENTRAL_CTRL_PROC_STATE_WAIT_RSP))
     {
         controller_central_ctrl_proc_reset();
     }
 
-    (void)ble_evt_notify_gap(BLE_GAP_EVT_FEATURE_EXCHANGED);
     controller_central_auto_ctrl_complete(BLE_GAP_CTRL_PROC_FEATURE_EXCHANGE);
 }
 
 void controller_central_handle_data_length_update_complete(void)
 {
+    if (m_link.role != BLE_GAP_ROLE_CENTRAL)
+    {
+        return;
+    }
+
     if ((m_ctrl_rt.central.central_ctrl_proc.procedure == BLE_GAP_CTRL_PROC_DATA_LENGTH_UPDATE) &&
         (m_ctrl_rt.central.central_ctrl_proc.state == BLE_CENTRAL_CTRL_PROC_STATE_WAIT_RSP))
     {
@@ -72,6 +81,11 @@ void controller_central_handle_data_length_update_complete(void)
 void controller_central_handle_unknown_rsp(uint8_t unsupported_opcode)
 {
     ble_gap_ctrl_procedure_t procedure;
+
+    if (m_link.role != BLE_GAP_ROLE_CENTRAL)
+    {
+        return;
+    }
 
     if ((m_ctrl_rt.central.central_ctrl_proc.state != BLE_CENTRAL_CTRL_PROC_STATE_WAIT_RSP) ||
         (unsupported_opcode != controller_central_ctrl_proc_request_opcode(m_ctrl_rt.central.central_ctrl_proc.procedure)))
@@ -87,24 +101,31 @@ void controller_central_handle_unknown_rsp(uint8_t unsupported_opcode)
 
 void controller_central_handle_conn_update_instant_complete(void)
 {
+    if (m_link.role != BLE_GAP_ROLE_CENTRAL)
+    {
+        return;
+    }
+
     if ((m_ctrl_rt.central.central_ctrl_proc.procedure == BLE_GAP_CTRL_PROC_CONN_UPDATE) &&
         (m_ctrl_rt.central.central_ctrl_proc.state == BLE_CENTRAL_CTRL_PROC_STATE_WAIT_INSTANT))
     {
         controller_central_ctrl_proc_reset();
     }
-
-    (void)ble_evt_notify_gap(BLE_GAP_EVT_CONN_UPDATE_IND);
 }
 
 void controller_central_handle_phy_update_instant_complete(void)
 {
+    if (m_link.role != BLE_GAP_ROLE_CENTRAL)
+    {
+        return;
+    }
+
     if ((m_ctrl_rt.central.central_ctrl_proc.procedure == BLE_GAP_CTRL_PROC_PHY_UPDATE) &&
         (m_ctrl_rt.central.central_ctrl_proc.state == BLE_CENTRAL_CTRL_PROC_STATE_WAIT_INSTANT))
     {
         controller_central_ctrl_proc_reset();
     }
 
-    (void)ble_evt_notify_gap(BLE_GAP_EVT_PHY_UPDATE_IND);
     controller_central_auto_ctrl_complete(BLE_GAP_CTRL_PROC_PHY_UPDATE);
 }
 
@@ -349,7 +370,8 @@ uint16_t controller_central_process_phy_rsp(const uint8_t *p_payload, uint8_t le
     uint8_t next_phy;
     uint16_t instant;
 
-    if ((m_ctrl_rt.central.central_ctrl_proc.procedure != BLE_GAP_CTRL_PROC_PHY_UPDATE) ||
+    if ((m_link.role != BLE_GAP_ROLE_CENTRAL) ||
+        (m_ctrl_rt.central.central_ctrl_proc.procedure != BLE_GAP_CTRL_PROC_PHY_UPDATE) ||
         (m_ctrl_rt.central.central_ctrl_proc.state != BLE_CENTRAL_CTRL_PROC_STATE_WAIT_RSP) ||
         (p_rsp == NULL) ||
         (len < 3U))

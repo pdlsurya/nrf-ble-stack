@@ -150,6 +150,11 @@ bool ble_gap_set_scan_filter(const ble_gap_scan_filter_t *p_filter)
 
 void ble_gap_clear_scan_filter(void)
 {
+    if (!ble_host_role_is_configured(BLE_GAP_ROLE_CENTRAL))
+    {
+        return;
+    }
+
     m_ctrl_rt.central.connect_filter_enabled = false;
     m_ctrl_rt.central.connect_filter = (ble_gap_scan_filter_t){0};
     m_ctrl_rt.central.connect_target_valid = false;

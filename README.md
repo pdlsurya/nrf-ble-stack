@@ -193,6 +193,15 @@ Before building the example, initialize the SDK submodule:
 git submodule update --init --recursive
 ```
 
+Then configure the ARM GCC toolchain path in the SDK makefile:
+
+```sh
+external/nrf5-sdk/components/toolchain/gcc/Makefile.posix
+```
+
+Set `GNU_INSTALL_ROOT` to the directory that contains `arm-none-eabi-gcc`,
+and set `GNU_VERSION` and `GNU_PREFIX` for your installed toolchain.
+
 Build the peripheral example with:
 
 ```sh
@@ -330,9 +339,10 @@ Central flow:
    and then switches to connected mode.
 5. Once connected, the central automatically sequences LL feature exchange,
    data length update, and a `1M | 2M` PHY request.
-6. If the peer performs the LL length or LL PHY procedures on its own, the
-   controller still updates the negotiated packet length or scheduled PHY state
-   and reports the resulting GAP events.
+6. If the peer performs LL feature exchange, LL length update, connection
+   update, or LL PHY update procedures on its own, shared controller handling
+   updates the negotiated link state and reports the resulting GAP events
+   without entering central-only procedure state from peripheral mode.
 7. Applications can start ATT MTU exchange and GATT discovery immediately
    after `BLE_GAP_EVT_CONNECTED`; automatic central LL control traffic stays
    ahead of queued ATT/L2CAP payloads.
