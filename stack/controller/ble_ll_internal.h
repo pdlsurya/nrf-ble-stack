@@ -1,5 +1,5 @@
 /**
- * @file ble_ll_types.h
+ * @file ble_ll_internal.h
  * @author Surya Poudel
  * @brief Shared internal link-layer packet types for nRF BLE stack
  * @version 0.1
@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef BLE_LL_TYPES_H__
-#define BLE_LL_TYPES_H__
+#ifndef BLE_LL_INTERNAL_H__
+#define BLE_LL_INTERNAL_H__
 
 #include <stdint.h>
 
@@ -18,6 +18,36 @@
 #define BLE_ADV_ADVERTISER_ADDRESS_LEN 6U
 #define BLE_LL_ADV_RX_PAYLOAD_MAX_LEN 128U
 #define BLE_LL_DATA_PAYLOAD_MAX_LEN 251U
+#define BLE_LL_DATA_HEADER_BITS 16U
+#define BLE_SCAN_REQ_PAYLOAD_LEN 12U
+#define BLE_LL_DATA_LEN_DEFAULT_OCTETS 27U
+#define BLE_LL_DATA_LEN_MAX_OCTETS 251U
+#define BLE_LL_DATA_LEN_DEFAULT_TIME 328U
+#define BLE_LL_DATA_LEN_MAX_TIME 2120U
+#define BLE_LL_CTRL_CONN_UPDATE_WIN_SIZE_UNITS 1U
+#define BLE_LL_CTRL_INSTANT_OFFSET_EVENTS 6U
+
+#define BLE_LL_CTRL_CONN_UPDATE_IND 0x00U
+#define BLE_LL_CTRL_CHANNEL_MAP_IND 0x01U
+#define BLE_LL_CTRL_TERMINATE_IND 0x02U
+#define BLE_LL_CTRL_UNKNOWN_RSP 0x07U
+#define BLE_LL_CTRL_FEATURE_REQ 0x08U
+#define BLE_LL_CTRL_FEATURE_RSP 0x09U
+#define BLE_LL_CTRL_VERSION_IND 0x0CU
+#define BLE_LL_CTRL_SLV_FEATURE_REQ 0x0EU
+#define BLE_LL_CTRL_LENGTH_REQ 0x14U
+#define BLE_LL_CTRL_LENGTH_RSP 0x15U
+#define BLE_LL_CTRL_PHY_REQ 0x16U
+#define BLE_LL_CTRL_PHY_RSP 0x17U
+#define BLE_LL_CTRL_PHY_UPDATE_IND 0x18U
+
+#define BLE_LL_VERSION_4_2 0x08U
+#define BLE_LL_COMPANY_ID_NORDIC 0x0059U
+#define BLE_LL_SUBVERSION 0x0000U
+#define BLE_LL_FEATURE_DATA_LENGTH_EXTENSION 0x20U
+#define BLE_LL_FEATURE_2M_PHY 0x01U
+#define BLE_LL_PHY_1M 0x01U
+#define BLE_LL_PHY_2M 0x02U
 
 typedef enum
 {
@@ -115,4 +145,4 @@ typedef struct
     uint8_t payload[BLE_LL_DATA_PAYLOAD_MAX_LEN];
 } __attribute__((packed)) ble_ll_data_raw_pdu_t;
 
-#endif /* BLE_LL_TYPES_H__ */
+#endif /* BLE_LL_INTERNAL_H__ */

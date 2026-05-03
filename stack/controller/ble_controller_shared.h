@@ -17,23 +17,12 @@
 #include "app_error.h"
 #include "nrf_delay.h"
 
-#define BLE_LL_DATA_HEADER_BITS 16U
-#define BLE_SCAN_REQ_PAYLOAD_LEN 12U
-#define BLE_PRIMARY_ADV_PDU_TYPE LL_ADV_IND
-#define BLE_INITIATOR_CONN_INTERVAL_UNITS_DEFAULT 24U
-#define BLE_INITIATOR_SUPERVISION_TIMEOUT_UNITS_DEFAULT 400U
-#define BLE_CONN_TIMER_COMPARE_CC_INDEX 0U
-#define BLE_CONN_TIMER_CAPTURE_CC_INDEX 1U
-#define BLE_CONN_TIMER_PPI_CH_RADIO_ADDRESS_CAPTURE 26U
 #define BLE_RADIO_IRQ_MASK_ADV (RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk | RADIO_INTENSET_DISABLED_Msk)
 #define BLE_RADIO_IRQ_MASK_SCAN (RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk | RADIO_INTENSET_DISABLED_Msk)
 #define BLE_RADIO_IRQ_MASK_CONN (RADIO_INTENSET_BCMATCH_Msk | RADIO_INTENSET_CRCOK_Msk | RADIO_INTENSET_CRCERROR_Msk | RADIO_INTENSET_DISABLED_Msk)
-#define BLE_AD_TYPE_INCOMPLETE_UUID16_LIST 0x02U
-#define BLE_AD_TYPE_COMPLETE_UUID16_LIST 0x03U
-#define BLE_AD_TYPE_INCOMPLETE_UUID128_LIST 0x06U
-#define BLE_AD_TYPE_COMPLETE_UUID128_LIST 0x07U
-#define BLE_AD_TYPE_SHORT_LOCAL_NAME 0x08U
-#define BLE_AD_TYPE_COMPLETE_LOCAL_NAME 0x09U
+#define BLE_CONN_TIMER_COMPARE_CC_INDEX 0U
+#define BLE_CONN_TIMER_CAPTURE_CC_INDEX 1U
+#define BLE_CONN_TIMER_PPI_CH_RADIO_ADDRESS_CAPTURE 26U
 
 void controller_set_mode_with_phy(radio_mode_t mode, uint8_t phy);
 void controller_conn_timer_schedule_compare(void);
@@ -44,9 +33,7 @@ ble_ll_data_header_t controller_conn_header(uint8_t llid);
 ble_ll_data_header_t controller_conn_header_for_state(uint8_t llid, uint8_t next_expected_rx_sn, uint8_t tx_sn);
 void controller_peripheral_adv_timer_init(void);
 void controller_central_scan_timers_init(void);
-void controller_central_scan_timer_start(uint32_t interval_ms);
 void controller_central_scan_timer_stop(void);
-void controller_central_scan_window_timer_start(uint32_t window_ms);
 void controller_central_scan_window_timer_stop(void);
 void controller_reset_conn_tx_selection_state(void);
 bool controller_queue_ll_control_payload(const uint8_t *p_payload, uint8_t payload_len);
@@ -59,28 +46,18 @@ void controller_prepare_connected_link(const ble_connect_req_pdu_t *p_req,
                                        ble_gap_role_t role,
                                        const ble_gap_addr_t *p_peer_addr);
 
-bool controller_central_scan_filter_matches(const ble_gap_addr_t *p_addr, const ble_adv_rx_pdu_t *p_rx);
-void controller_central_build_connect_request(const ble_gap_addr_t *p_peer_addr);
-void controller_central_reset_scan_state(void);
-void controller_central_handle_scan_crc_ok(const ble_adv_rx_pdu_t *p_scan_rx);
 void controller_central_state_reset(void);
+void controller_central_handle_feature_exchange_complete(void);
+void controller_central_handle_data_length_update_complete(void);
+void controller_central_handle_unknown_rsp(uint8_t unsupported_opcode);
+void controller_central_handle_conn_update_instant_complete(void);
+void controller_central_handle_phy_update_instant_complete(void);
 void controller_central_auto_ctrl_start(void);
-void controller_central_auto_ctrl_complete(ble_gap_ctrl_procedure_t procedure);
-void controller_central_ctrl_proc_reset(void);
-uint8_t controller_central_ctrl_proc_request_opcode(ble_gap_ctrl_procedure_t procedure);
 uint16_t controller_central_process_phy_rsp(const uint8_t *p_payload, uint8_t len, uint8_t *p_rsp);
-void controller_peripheral_reset_adv_state(void);
-void controller_peripheral_handle_adv_crc_ok(const ble_adv_rx_pdu_t *p_adv_rx);
+void controller_peripheral_state_reset(void);
 void controller_peripheral_start_connection_event(void);
 void controller_central_start_connection_event(void);
-void radio_handle_connected_packet_peripheral(void);
-void radio_handle_connected_crc_error_peripheral(void);
-void radio_handle_connected_packet_central(void);
-void radio_handle_connected_crc_error_central(void);
-void radio_handle_connected_bcmatch_peripheral(void);
-void controller_peripheral_handle_connected_disabled(void);
-void controller_central_handle_connected_disabled(void);
-void controller_peripheral_handle_adv_disabled(void);
-void controller_central_handle_scan_disabled(void);
+void controller_central_handle_radio_event(radio_event_t evt, const ble_adv_rx_pdu_t *p_scan_rx);
+void controller_peripheral_handle_radio_event(radio_event_t evt, const ble_adv_rx_pdu_t *p_adv_rx);
 
 #endif

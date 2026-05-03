@@ -142,17 +142,17 @@ bool ble_gap_set_scan_filter(const ble_gap_scan_filter_t *p_filter)
         return false;
     }
 
-    m_ctrl_rt.connect_filter = *p_filter;
-    m_ctrl_rt.connect_filter_enabled = true;
-    m_ctrl_rt.connect_target_valid = false;
+    m_ctrl_rt.central.connect_filter = *p_filter;
+    m_ctrl_rt.central.connect_filter_enabled = true;
+    m_ctrl_rt.central.connect_target_valid = false;
     return true;
 }
 
 void ble_gap_clear_scan_filter(void)
 {
-    m_ctrl_rt.connect_filter_enabled = false;
-    m_ctrl_rt.connect_filter = (ble_gap_scan_filter_t){0};
-    m_ctrl_rt.connect_target_valid = false;
+    m_ctrl_rt.central.connect_filter_enabled = false;
+    m_ctrl_rt.central.connect_filter = (ble_gap_scan_filter_t){0};
+    m_ctrl_rt.central.connect_target_valid = false;
 }
 
 bool ble_gap_request_conn_params_update(void)
