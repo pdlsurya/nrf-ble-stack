@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include "nrf.h"
 #include "nrf_drv_usbd.h"
 #include "nrf_drv_clock.h"
@@ -39,8 +40,8 @@ cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
 #define CDC_ACM_DATA_EPIN NRF_DRV_USBD_EPIN1
 #define CDC_ACM_DATA_EPOUT NRF_DRV_USBD_EPOUT1
 
-#define MAX_logs_to_print 64
-#define MAX_LOG_SIZE 96
+#define MAX_LOGS_TO_PRINT 64
+#define MAX_LOG_SIZE (NRF_DRV_USBD_EPSIZE - 1)
 
 /**
  * @brief CDC_ACM class instance
@@ -54,13 +55,12 @@ APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm, cdc_acm_user_ev_handler,
 #define READ_SIZE 1
 
 static char m_rx_buffer[READ_SIZE];
-static char tx_buffer[NRF_DRV_USBD_EPSIZE];
 static bool log_in_progress;
 static uint8_t logs_to_print;
-static char log_buffer_queue[MAX_LOG_SIZE * MAX_logs_to_print];
+static char log_buffer_queue[MAX_LOG_SIZE * MAX_LOGS_TO_PRINT];
 static uint8_t print_next_indx;
 static uint8_t load_next_indx;
-static uint8_t log_size[MAX_logs_to_print];
+static uint8_t log_size[MAX_LOGS_TO_PRINT];
 
 static bool port_open = false;
 /**
@@ -87,10 +87,13 @@ cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
     break;
   case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
   {
-    print_next_indx++;
-    if (print_next_indx == MAX_logs_to_print)
-      print_next_indx = 0;
-    logs_to_print--;
+    if (logs_to_print > 0)
+    {
+      print_next_indx++;
+      if (print_next_indx == MAX_LOGS_TO_PRINT)
+        print_next_indx = 0;
+      logs_to_print--;
+    }
     log_in_progress = false;
     break;
   }
@@ -196,7 +199,7 @@ void log_init(void)
 }
 void log_printf(const char *format, ...)
 {
-  char buffer[96];
+  char buffer[MAX_LOG_SIZE + 1];
   int written;
   size_t size;
   va_list args;
@@ -211,36 +214,37 @@ void log_printf(const char *format, ...)
   size = (size_t)written;
   if (size >= sizeof(buffer))
     size = sizeof(buffer) - 1U;
-  if (size >= sizeof(tx_buffer))
-    size = sizeof(tx_buffer) - 1U;
 
-  memcpy(tx_buffer, buffer, size);
-  tx_buffer[size] = '\0';
+  if (logs_to_print == MAX_LOGS_TO_PRINT)
+  {
+    return;
+  }
 
-  if (size > MAX_LOG_SIZE)
-    size = MAX_LOG_SIZE;
-  log_size[load_next_indx] = size;
-  memcpy(log_buffer_queue + load_next_indx * MAX_LOG_SIZE, tx_buffer, size);
+  log_size[load_next_indx] = (uint8_t)size;
+  memcpy(log_buffer_queue + load_next_indx * MAX_LOG_SIZE, buffer, size);
   logs_to_print++;
-  if (logs_to_print == MAX_logs_to_print) // needs to change this
-    logs_to_print = 0;
 
   load_next_indx++;
 
-  if (load_next_indx == MAX_logs_to_print)
+  if (load_next_indx == MAX_LOGS_TO_PRINT)
     load_next_indx = 0;
 }
 
 void log_idle(void)
 {
+  ret_code_t ret;
+
   while (app_usbd_event_queue_process())
     ;
 
   if (!log_in_progress && port_open && logs_to_print > 0)
   {
-    app_usbd_cdc_acm_write(&m_app_cdc_acm,
-                           log_buffer_queue + print_next_indx * MAX_LOG_SIZE,
-                           log_size[print_next_indx]);
-    log_in_progress = true;
+    ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,
+                                 log_buffer_queue + print_next_indx * MAX_LOG_SIZE,
+                                 log_size[print_next_indx]);
+    if (ret == NRF_SUCCESS)
+    {
+      log_in_progress = true;
+    }
   }
 }
