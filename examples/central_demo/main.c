@@ -5,6 +5,7 @@
 
 #include "app_error.h"
 #include "boards.h"
+#include "nrf.h"
 #include "nrf_ble.h"
 #include "nrf_drv_clock.h"
 #include "usb_log.h"
@@ -616,6 +617,6 @@ int main(void)
 
     while (1)
     {
-        log_idle();
+        __WFE();
     }
 }

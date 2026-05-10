@@ -221,9 +221,8 @@ Notes:
 - For `BOARD_PCA10059`, the example uses `bsp_board_init(BSP_INIT_LEDS)` so the
   SDK handles the dongle `REGOUT0` LED-voltage setup.
 - The example uses the SDK clock driver for LFCLK and HFCLK startup.
-- Because the USB CDC logger needs its event queue serviced in thread context,
-  the bundled example calls `log_idle()` in the main loop instead of sleeping
-  with `__WFE()`.
+- The USB CDC logger is self-pumping with interrupt-driven USBD events, so the
+  bundled examples can sleep with `__WFE()` instead of polling a log idle hook.
 
 ## Runtime Flow Summary
 

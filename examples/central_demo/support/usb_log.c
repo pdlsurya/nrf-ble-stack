@@ -1,8 +1,9 @@
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "nrf.h"
 #include "nrf_drv_usbd.h"
 #include "nrf_drv_clock.h"
@@ -20,18 +21,13 @@
 
 #include "bsp.h"
 #include "stdarg.h"
-/**
- * @brief Enable power USB detection
- *
- * Configure if example supports USB port connection
- */
+
 #ifndef USBD_POWER_DETECTION
 #define USBD_POWER_DETECTION true
 #endif
 
-static void
-cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
-                        app_usbd_cdc_acm_user_event_t event);
+static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
+                                    app_usbd_cdc_acm_user_event_t event);
 
 #define CDC_ACM_COMM_INTERFACE 0
 #define CDC_ACM_COMM_EPIN NRF_DRV_USBD_EPIN2
@@ -43,107 +39,142 @@ cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
 #define MAX_LOGS_TO_PRINT 64
 #define MAX_LOG_SIZE (NRF_DRV_USBD_EPSIZE - 1)
 
-/**
- * @brief CDC_ACM class instance
- * */
-APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm, cdc_acm_user_ev_handler,
-                            CDC_ACM_COMM_INTERFACE, CDC_ACM_DATA_INTERFACE,
-                            CDC_ACM_COMM_EPIN, CDC_ACM_DATA_EPIN,
+APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,
+                            cdc_acm_user_ev_handler,
+                            CDC_ACM_COMM_INTERFACE,
+                            CDC_ACM_DATA_INTERFACE,
+                            CDC_ACM_COMM_EPIN,
+                            CDC_ACM_DATA_EPIN,
                             CDC_ACM_DATA_EPOUT,
                             APP_USBD_CDC_COMM_PROTOCOL_AT_V250);
 
 #define READ_SIZE 1
 
 static char m_rx_buffer[READ_SIZE];
-static bool log_in_progress;
-static uint8_t logs_to_print;
+static volatile bool log_in_progress;
+static volatile uint8_t logs_to_print;
 static char log_buffer_queue[MAX_LOG_SIZE * MAX_LOGS_TO_PRINT];
-static uint8_t print_next_indx;
-static uint8_t load_next_indx;
+static volatile uint8_t print_next_indx;
+static volatile uint8_t load_next_indx;
 static uint8_t log_size[MAX_LOGS_TO_PRINT];
+static volatile bool port_open;
 
-static bool port_open = false;
-/**
- * @brief User event handler @ref app_usbd_cdc_acm_user_ev_handler_t (headphones)
- * */
-static void
-cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
-                        app_usbd_cdc_acm_user_event_t event)
+static void log_tx_pump(void);
+
+static void log_queue_pop_sent(void)
 {
+  CRITICAL_REGION_ENTER();
+  if (logs_to_print > 0)
+  {
+    print_next_indx++;
+    if (print_next_indx == MAX_LOGS_TO_PRINT)
+    {
+      print_next_indx = 0;
+    }
+    logs_to_print--;
+  }
+  log_in_progress = false;
+  CRITICAL_REGION_EXIT();
+}
+
+static void log_tx_pump(void)
+{
+  ret_code_t ret;
+  uint8_t read_idx;
+  uint8_t size;
+
+  CRITICAL_REGION_ENTER();
+  if (log_in_progress || !port_open || (logs_to_print == 0))
+  {
+    CRITICAL_REGION_EXIT();
+    return;
+  }
+
+  read_idx = print_next_indx;
+  size = log_size[read_idx];
+  log_in_progress = true;
+  CRITICAL_REGION_EXIT();
+
+  ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,
+                               log_buffer_queue + read_idx * MAX_LOG_SIZE,
+                               size);
+  if (ret != NRF_SUCCESS)
+  {
+    CRITICAL_REGION_ENTER();
+    log_in_progress = false;
+    CRITICAL_REGION_EXIT();
+  }
+}
+
+static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const *p_inst,
+                                    app_usbd_cdc_acm_user_event_t event)
+{
+  UNUSED_PARAMETER(p_inst);
 
   switch (event)
   {
   case APP_USBD_CDC_ACM_USER_EVT_PORT_OPEN:
   {
     port_open = true;
-    /*Setup first transfer*/
-    ret_code_t ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer,
-                                           READ_SIZE);
+    ret_code_t ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
     UNUSED_VARIABLE(ret);
+    log_tx_pump();
     break;
   }
+
   case APP_USBD_CDC_ACM_USER_EVT_PORT_CLOSE:
     port_open = false;
     break;
+
   case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
-  {
-    if (logs_to_print > 0)
-    {
-      print_next_indx++;
-      if (print_next_indx == MAX_LOGS_TO_PRINT)
-        print_next_indx = 0;
-      logs_to_print--;
-    }
-    log_in_progress = false;
+    log_queue_pop_sent();
+    log_tx_pump();
     break;
-  }
+
   case APP_USBD_CDC_ACM_USER_EVT_RX_DONE:
   {
     ret_code_t ret;
     do
     {
-      /* Fetch data until internal buffer is empty */
-      ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer,
-                                  READ_SIZE);
+      ret = app_usbd_cdc_acm_read(&m_app_cdc_acm, m_rx_buffer, READ_SIZE);
     } while (ret == NRF_SUCCESS);
-
     break;
   }
+
   default:
     break;
   }
 }
 
-static void
-usbd_user_ev_handler(app_usbd_event_type_t event)
+static void usbd_user_ev_handler(app_usbd_event_type_t event)
 {
   switch (event)
   {
   case APP_USBD_EVT_DRV_SUSPEND:
-
-    break;
   case APP_USBD_EVT_DRV_RESUME:
-
-    break;
   case APP_USBD_EVT_STARTED:
     break;
+
   case APP_USBD_EVT_STOPPED:
     app_usbd_disable();
     bsp_board_leds_off();
     break;
-  case APP_USBD_EVT_POWER_DETECTED:
 
+  case APP_USBD_EVT_POWER_DETECTED:
     if (!nrf_drv_usbd_is_enabled())
     {
       app_usbd_enable();
     }
     break;
+
   case APP_USBD_EVT_POWER_REMOVED:
     app_usbd_stop();
     break;
+
   case APP_USBD_EVT_POWER_READY:
     app_usbd_start();
     break;
+
   default:
     break;
   }
@@ -151,14 +182,16 @@ usbd_user_ev_handler(app_usbd_event_type_t event)
 
 void log_init(void)
 {
+  ret_code_t ret;
+  static const app_usbd_config_t usbd_config = {
+      .ev_state_proc = usbd_user_ev_handler,
+  };
+
   print_next_indx = 0;
   load_next_indx = 0;
   logs_to_print = 0;
   log_in_progress = false;
-
-  ret_code_t ret;
-  static const app_usbd_config_t usbd_config =
-      {.ev_state_proc = usbd_user_ev_handler};
+  port_open = false;
 
   if (!nrf_drv_clock_init_check())
   {
@@ -172,24 +205,25 @@ void log_init(void)
   if (!nrf_drv_clock_lfclk_is_running())
   {
     nrf_drv_clock_lfclk_request(NULL);
-
     while (!nrf_drv_clock_lfclk_is_running())
     {
-      /* Just waiting */
     }
   }
 
   app_usbd_serial_num_generate();
 
-  APP_ERROR_CHECK(app_usbd_init(&usbd_config));
+  ret = app_usbd_init(&usbd_config);
+  APP_ERROR_CHECK(ret);
 
-  app_usbd_class_inst_t const *class_cdc_acm = app_usbd_cdc_acm_class_inst_get(
-      &m_app_cdc_acm);
-  APP_ERROR_CHECK(app_usbd_class_append(class_cdc_acm));
+  app_usbd_class_inst_t const *class_cdc_acm =
+      app_usbd_cdc_acm_class_inst_get(&m_app_cdc_acm);
+  ret = app_usbd_class_append(class_cdc_acm);
+  APP_ERROR_CHECK(ret);
 
   if (USBD_POWER_DETECTION)
   {
-    APP_ERROR_CHECK(app_usbd_power_events_enable());
+    ret = app_usbd_power_events_enable();
+    APP_ERROR_CHECK(ret);
   }
   else
   {
@@ -197,11 +231,13 @@ void log_init(void)
     app_usbd_start();
   }
 }
+
 void log_printf(const char *format, ...)
 {
   char buffer[MAX_LOG_SIZE + 1];
   int written;
   size_t size;
+  uint8_t write_idx;
   va_list args;
 
   va_start(args, format);
@@ -209,42 +245,34 @@ void log_printf(const char *format, ...)
   va_end(args);
 
   if (written < 0)
+  {
     return;
+  }
 
   size = (size_t)written;
   if (size >= sizeof(buffer))
+  {
     size = sizeof(buffer) - 1U;
+  }
 
+  CRITICAL_REGION_ENTER();
   if (logs_to_print == MAX_LOGS_TO_PRINT)
   {
+    CRITICAL_REGION_EXIT();
     return;
   }
 
-  log_size[load_next_indx] = (uint8_t)size;
-  memcpy(log_buffer_queue + load_next_indx * MAX_LOG_SIZE, buffer, size);
-  logs_to_print++;
+  write_idx = load_next_indx;
+  log_size[write_idx] = (uint8_t)size;
+  memcpy(log_buffer_queue + write_idx * MAX_LOG_SIZE, buffer, size);
 
   load_next_indx++;
-
   if (load_next_indx == MAX_LOGS_TO_PRINT)
-    load_next_indx = 0;
-}
-
-void log_idle(void)
-{
-  ret_code_t ret;
-
-  while (app_usbd_event_queue_process())
-    ;
-
-  if (!log_in_progress && port_open && logs_to_print > 0)
   {
-    ret = app_usbd_cdc_acm_write(&m_app_cdc_acm,
-                                 log_buffer_queue + print_next_indx * MAX_LOG_SIZE,
-                                 log_size[print_next_indx]);
-    if (ret == NRF_SUCCESS)
-    {
-      log_in_progress = true;
-    }
+    load_next_indx = 0;
   }
+  logs_to_print++;
+  CRITICAL_REGION_EXIT();
+
+  log_tx_pump();
 }
