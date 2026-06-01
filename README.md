@@ -23,12 +23,12 @@ layers so packet flow is easy to follow in code.
 - nRF52 series support only
 - Peripheral and central role support
 - One role active at a time
-- Advertising with configurable name, flags, TX power, interval, and one
-  included service UUID
+- Advertising with configurable name, flags, TX power, interval, service UUID,
+  service data, and manufacturer-specific data
 - Passive and active legacy scanning with scan report callbacks, optional
   auto-connect filter, and `scan_response` reporting
-- Minimal legacy `SCAN_RSP` support for active scanners that send `SCAN_REQ`
-  before showing or connecting
+- Legacy `SCAN_RSP` support with separate application-defined advertising and
+  scan-response data blocks
 - Standard 16-bit SIG UUIDs and vendor UUIDs expanded from one registered
   128-bit base UUID
 - Runtime registration of custom GATT services and characteristics
@@ -120,6 +120,46 @@ See [nrf_ble.h](stack/include/nrf_ble.h),
 [ble_gatt_server.h](stack/include/ble_gatt_server.h), and
 [ble_gatt_client.h](stack/include/ble_gatt_client.h) for the full public
 interface.
+
+### Advertising Data
+
+`ble_adv_config_t` has separate `adv_data` and `scan_response_data` blocks.
+Each block can include a local name, TX power, one service UUID, service data,
+and manufacturer-specific data. Fields set to `NULL` are omitted.
+
+```c
+static uint8_t service_payload[] = { 0x01U, 0x00U };
+static const int8_t tx_power = 0x08;
+static const ble_uuid_t service_uuid = BLE_UUID_SIG16_INIT(0x1809U);
+static const ble_gap_adv_name_config_t short_name = {
+    .name_type = BLE_GAP_ADV_NAME_SHORT,
+    .short_name_length = 7U,
+};
+static const ble_gap_service_data_t service_data = {
+    .uuid = BLE_UUID_SIG16_INIT(0x1809U),
+    .p_data = service_payload,
+    .data_len = sizeof(service_payload),
+};
+static const ble_adv_config_t adv_config = {
+    .flags = (uint8_t)(BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE |
+                       BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED),
+    .interval_ms = 100U,
+    .adv_type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED,
+    .adv_data = {
+        .p_name = &short_name,
+        .p_tx_power = &tx_power,
+        .p_service_uuid = &service_uuid,
+        .p_service_data = &service_data,
+    },
+};
+```
+
+The stack copies advertising metadata during `ble_gap_adv_init()`, but service
+data and manufacturer-specific data payload pointers are retained. Applications
+can update those backing buffers between advertising events. The buffers must
+remain valid while the advertising configuration is active. If a configured AD
+structure does not fit in the selected legacy packet, the packet builder omits
+that structure.
 
 ## Architecture At A Glance
 
@@ -255,16 +295,19 @@ Common setup:
 
 Peripheral flow:
 
-1. `ble_gap_adv_init()` stores advertising parameters.
+1. `ble_gap_adv_init()` stores advertising parameters and copies configured
+   advertising and scan-response metadata. Service data and manufacturer-data
+   payload pointers are retained so applications can update those buffers
+   between advertising events.
 2. `ble_gatt_server_init()` builds the ATT database from the application's
    service table.
 3. `ble_gap_start_advertising()` starts repeated advertising events on channels
    37, 38, and 39.
 4. After each advertising transmission, the controller opens a short RX window
    and listens for a targeted `SCAN_REQ` or `CONNECT_REQ`.
-5. When a valid `SCAN_REQ` is received, the controller sends a minimal
-   `SCAN_RSP` that carries the advertiser address so active scanners can keep
-   the advertising event visible without adding extra payload turnaround work.
+5. When a valid `SCAN_REQ` is received, the controller sends a `SCAN_RSP` that
+   carries the advertiser address and any configured scan-response AD
+   structures.
 6. When a `CONNECT_REQ` that targets the local advertiser address and address
    type is received, the controller switches to connected mode, starts
    connection-event timing with `TIMER0`, and begins using the data channel
@@ -316,8 +359,10 @@ Central flow:
 - The controller files own BLE packet flow, timing, and LL control handling.
 - The controller only accepts legacy `SCAN_REQ` and `CONNECT_REQ` packets whose
   advertiser address and `RxAdd` bit match the current advertising identity.
-- Scan responses are intentionally minimal so the advertising RX->TX turnaround
-  stays simple and reliable across scanners that actively probe advertisements.
+- Optional name, TX power, service UUID, service data, and
+  manufacturer-specific data fields can be configured separately for the primary
+  advertising packet and scan response. Fields that do not fit in the selected
+  packet are omitted by the packet builder.
 - Connected event timing uses `TIMER0` compare scheduling and the nRF52840
   fixed PPI `RADIO ADDRESS -> TIMER0 CAPTURE[1]` path to re-anchor future
   events from the actual on-air receive timing.

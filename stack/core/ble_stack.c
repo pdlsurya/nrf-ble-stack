@@ -26,7 +26,6 @@ void ble_stack_init(ble_gap_role_t role)
                                BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED),
             .adv_interval_ms = BLE_ADV_INTERVAL_MS_DEFAULT,
             .adv_type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED,
-            .adv_name_type = BLE_GAP_ADV_NAME_FULL,
         },
         .central = {
             .scan_config = {

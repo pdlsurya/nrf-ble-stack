@@ -50,6 +50,34 @@ static const uint8_t m_custom_uuid_base[BLE_UUID128_LEN] = {
     0x00U,
 };
 static const ble_uuid_t m_custom_service_uuid = BLE_UUID_VENDOR16_INIT(0xFFF0U);
+static const int8_t m_adv_tx_power = 0x08;
+static const ble_gap_adv_name_config_t m_adv_name = {
+    .name_type = BLE_GAP_ADV_NAME_SHORT,
+    .short_name_length = 4U,
+};
+static const ble_gap_adv_name_config_t m_scan_response_name = {
+    .name_type = BLE_GAP_ADV_NAME_FULL,
+};
+static const uint8_t m_adv_service_data[] = {
+    0x01U,
+    0x00U,
+};
+static const uint8_t m_adv_manufacturer_data[] = {
+    0x10U,
+    0x01U,
+    0x00U,
+    0x00U,
+};
+static const ble_gap_service_data_t m_service_data = {
+    .uuid = BLE_UUID_VENDOR16_INIT(0xFFF0U),
+    .p_data = m_adv_service_data,
+    .data_len = sizeof(m_adv_service_data),
+};
+static const ble_gap_manufacturer_data_t m_manufacturer_data = {
+    .company_id = 0x0059U,
+    .p_data = m_adv_manufacturer_data,
+    .data_len = sizeof(m_adv_manufacturer_data),
+};
 static const ble_gap_conn_params_t m_gap_conn_params = {
     .min_conn_interval_1p25ms = MS_TO_1P25MS_UNITS(30U),
     .max_conn_interval_1p25ms = MS_TO_1P25MS_UNITS(30U),
@@ -59,11 +87,18 @@ static const ble_gap_conn_params_t m_gap_conn_params = {
 static const ble_adv_config_t m_adv_config = {
     .flags = (uint8_t)(BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE |
                        BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED),
-    .tx_power = 0x08,
     .interval_ms = 100U,
-    .p_included_service_uuid = &m_custom_service_uuid,
-    .name_type = BLE_GAP_ADV_NAME_SHORT,
-    .short_name_length = 7U,
+    .adv_type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED,
+    .adv_data = {
+        .p_name = &m_adv_name,
+        .p_tx_power = &m_adv_tx_power,
+        .p_service_uuid = &m_custom_service_uuid,
+    },
+    .scan_response_data = {
+        .p_name = &m_scan_response_name,
+        .p_service_data = &m_service_data,
+        .p_manufacturer_data = &m_manufacturer_data,
+    },
 };
 
 static ble_gatt_characteristic_t m_custom_characteristics[] = {
@@ -310,7 +345,7 @@ int main(void)
   ble_gap_set_device_name(m_dev_name);
   ble_gap_set_conn_params(&m_gap_conn_params);
   ble_uuid_set_vendor_base(m_custom_uuid_base);
-  ble_gap_adv_init(&m_adv_config);
+  APP_ERROR_CHECK_BOOL(ble_gap_adv_init(&m_adv_config));
   APP_ERROR_CHECK_BOOL(ble_gatt_server_init(m_custom_services,
                                             (uint8_t)(sizeof(m_custom_services) / sizeof(m_custom_services[0]))));
 

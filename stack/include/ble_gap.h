@@ -31,6 +31,9 @@
 #define BLE_AD_TYPE_SHORT_LOCAL_NAME 0x08U
 #define BLE_AD_TYPE_COMPLETE_LOCAL_NAME 0x09U
 #define BLE_AD_TYPE_TX_POWER_LEVEL 0x0A
+#define BLE_AD_TYPE_SERVICE_DATA_UUID16 0x16U
+#define BLE_AD_TYPE_SERVICE_DATA_UUID128 0x21U
+#define BLE_AD_TYPE_MANUFACTURER_SPECIFIC_DATA 0xFFU
 
 #define BLE_GAP_PHY_1MBPS 0x01U
 #define BLE_GAP_PHY_2MBPS 0x02U
@@ -39,6 +42,7 @@
 #define BLE_SCAN_INTERVAL_MS_DEFAULT 100U
 #define BLE_SCAN_WINDOW_MS_DEFAULT 50U
 #define BLE_GAP_ADV_DATA_MAX_LEN 31U
+#define BLE_GAP_ADV_FIELD_DATA_MAX_LEN 27U
 #define BLE_GAP_SCAN_FILTER_NAME_MAX_LEN BLE_GAP_ADV_DATA_MAX_LEN
 
 #define MS_TO_1P25MS_UNITS(ms) \
@@ -80,13 +84,40 @@ typedef struct
 
 typedef struct
 {
-    uint8_t flags;
-    int8_t tx_power;
-    uint16_t interval_ms;
-    const ble_uuid_t *p_included_service_uuid;
+    ble_uuid_t uuid;
+    const uint8_t *p_data;
+    uint8_t data_len;
+} ble_gap_service_data_t;
+
+typedef struct
+{
+    uint16_t company_id;
+    const uint8_t *p_data;
+    uint8_t data_len;
+} ble_gap_manufacturer_data_t;
+
+typedef struct
+{
     ble_gap_adv_name_type_t name_type;
     uint8_t short_name_length;
+} ble_gap_adv_name_config_t;
+
+typedef struct
+{
+    const ble_gap_adv_name_config_t *p_name;
+    const int8_t *p_tx_power;
+    const ble_uuid_t *p_service_uuid;
+    const ble_gap_service_data_t *p_service_data;
+    const ble_gap_manufacturer_data_t *p_manufacturer_data;
+} ble_gap_adv_data_config_t;
+
+typedef struct
+{
+    uint8_t flags;
+    uint16_t interval_ms;
     ble_gap_adv_type_t adv_type;
+    ble_gap_adv_data_config_t adv_data;
+    ble_gap_adv_data_config_t scan_response_data;
 } ble_adv_config_t;
 
 typedef struct
@@ -199,9 +230,17 @@ void ble_gap_register_scan_report_handler(ble_gap_scan_report_handler_t handler)
 /**
  * @brief Store advertising parameters used by ble_gap_start_advertising().
  *
+ * Service data and manufacturer-specific data payload pointers are retained,
+ * allowing the application to update those buffers between advertising events.
+ * The pointed-to buffers must remain valid while the advertising configuration
+ * is active.
+ *
  * @param[in] p_config Advertising configuration, or NULL for defaults.
+ *
+ * @retval true The advertising configuration was accepted.
+ * @retval false The configuration is invalid.
  */
-void ble_gap_adv_init(const ble_adv_config_t *p_config);
+bool ble_gap_adv_init(const ble_adv_config_t *p_config);
 
 /**
  * @brief Store scanning parameters used by ble_gap_start_scanning().

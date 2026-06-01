@@ -139,12 +139,25 @@ typedef struct
 
 typedef struct
 {
+    bool name_present;
+    ble_gap_adv_name_config_t name;
+    bool tx_power_present;
+    int8_t tx_power;
+    bool service_uuid_present;
+    ble_uuid_t service_uuid;
+    bool service_data_present;
+    ble_gap_service_data_t service_data;
+    bool manufacturer_data_present;
+    ble_gap_manufacturer_data_t manufacturer_data;
+} ble_host_adv_data_t;
+
+typedef struct
+{
     uint8_t flags;
     uint16_t adv_interval_ms;
     ble_gap_adv_type_t adv_type;
-    ble_gap_adv_name_type_t adv_name_type;
-    uint8_t adv_short_name_length;
-    ble_uuid_t adv_included_service_uuid;
+    ble_host_adv_data_t adv_data;
+    ble_host_adv_data_t scan_response_data;
     uint8_t service_count;
 } ble_host_peripheral_t;
 

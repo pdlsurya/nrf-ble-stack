@@ -219,37 +219,122 @@ static bool ble_gap_adv_type_is_supported(ble_gap_adv_type_t adv_type)
            (adv_type == BLE_GAP_ADV_TYPE_NONCONNECTABLE_SCANNABLE_UNDIRECTED);
 }
 
-void ble_gap_adv_init(const ble_adv_config_t *p_config)
+static bool ble_gap_adv_data_config_copy(const ble_gap_adv_data_config_t *p_src,
+                                         ble_host_adv_data_t *p_dst)
 {
+    if ((p_src == NULL) || (p_dst == NULL))
+    {
+        return false;
+    }
+
+    *p_dst = (ble_host_adv_data_t){0};
+
+    if (p_src->p_name != NULL)
+    {
+        p_dst->name = *p_src->p_name;
+        if (p_dst->name.name_type > BLE_GAP_ADV_NAME_SHORT)
+        {
+            p_dst->name.name_type = BLE_GAP_ADV_NAME_FULL;
+        }
+        if (p_dst->name.short_name_length > BLE_GAP_DEVICE_NAME_MAX_LEN)
+        {
+            p_dst->name.short_name_length = BLE_GAP_DEVICE_NAME_MAX_LEN;
+        }
+        p_dst->name_present = true;
+    }
+
+    if (p_src->p_tx_power != NULL)
+    {
+        p_dst->tx_power = *p_src->p_tx_power;
+        p_dst->tx_power_present = true;
+    }
+
+    if (p_src->p_service_uuid != NULL)
+    {
+        p_dst->service_uuid = *p_src->p_service_uuid;
+        p_dst->service_uuid_present = true;
+    }
+
+    if (p_src->p_service_data != NULL)
+    {
+        if ((p_src->p_service_data->data_len > BLE_GAP_ADV_FIELD_DATA_MAX_LEN) ||
+            ((p_src->p_service_data->data_len != 0U) &&
+             (p_src->p_service_data->p_data == NULL)))
+        {
+            return false;
+        }
+
+        p_dst->service_data = *p_src->p_service_data;
+        p_dst->service_data_present = true;
+    }
+
+    if (p_src->p_manufacturer_data != NULL)
+    {
+        if ((p_src->p_manufacturer_data->data_len > BLE_GAP_ADV_FIELD_DATA_MAX_LEN) ||
+            ((p_src->p_manufacturer_data->data_len != 0U) &&
+             (p_src->p_manufacturer_data->p_data == NULL)))
+        {
+            return false;
+        }
+
+        p_dst->manufacturer_data = *p_src->p_manufacturer_data;
+        p_dst->manufacturer_data_present = true;
+    }
+
+    return true;
+}
+
+bool ble_gap_adv_init(const ble_adv_config_t *p_config)
+{
+    ble_gap_adv_type_t adv_type;
+    static const ble_gap_adv_name_config_t default_name = {
+        .name_type = BLE_GAP_ADV_NAME_FULL,
+        .short_name_length = 0U,
+    };
+    static const ble_gap_adv_data_config_t empty_adv_data = {0};
+    const ble_gap_adv_data_config_t default_adv_data = {
+        .p_name = &default_name,
+    };
+    const ble_gap_adv_data_config_t *p_adv_data;
+    const ble_gap_adv_data_config_t *p_scan_response_data;
+
     if (!ble_host_role_is_configured(BLE_GAP_ROLE_PERIPHERAL))
     {
-        return;
+        return false;
+    }
+
+    adv_type = ((p_config != NULL) && ble_gap_adv_type_is_supported(p_config->adv_type))
+                   ? p_config->adv_type
+                   : BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
+
+    p_adv_data = (p_config != NULL) ? &p_config->adv_data : &default_adv_data;
+    p_scan_response_data = (p_config != NULL) ? &p_config->scan_response_data
+                                              : &empty_adv_data;
+
+    if (!ble_gap_adv_data_config_copy(p_adv_data, &m_host.peripheral.adv_data) ||
+        !ble_gap_adv_data_config_copy(p_scan_response_data, &m_host.peripheral.scan_response_data))
+    {
+        return false;
     }
 
     m_host.peripheral.flags = (p_config != NULL) ? p_config->flags
                                                  : (uint8_t)(BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE |
                                                              BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED);
-    m_host.common.tx_power = (p_config != NULL) ? p_config->tx_power : 0;
-    m_host.peripheral.adv_name_type = (p_config != NULL) ? p_config->name_type : BLE_GAP_ADV_NAME_FULL;
-    m_host.peripheral.adv_short_name_length = (p_config != NULL) ? p_config->short_name_length : 0U;
-    m_host.peripheral.adv_type = ((p_config != NULL) && ble_gap_adv_type_is_supported(p_config->adv_type))
-                                     ? p_config->adv_type
-                                     : BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
-    m_host.peripheral.adv_interval_ms = ((p_config != NULL) && (p_config->interval_ms != 0U)) ? p_config->interval_ms
-                                                                                              : BLE_ADV_INTERVAL_MS_DEFAULT;
-    m_host.peripheral.adv_included_service_uuid = ((p_config != NULL) && (p_config->p_included_service_uuid != NULL))
-                                                      ? *p_config->p_included_service_uuid
-                                                      : (ble_uuid_t)BLE_UUID_NONE_INIT;
-    m_host.peripheral.service_count = ((p_config != NULL) && (p_config->p_included_service_uuid != NULL)) ? 1U : 0U; // Defaults adv included service uuid type to complete list of 16-bit/128-bit UUIDs.
-
-    if (m_host.peripheral.adv_name_type > BLE_GAP_ADV_NAME_SHORT)
-    {
-        m_host.peripheral.adv_name_type = BLE_GAP_ADV_NAME_FULL;
-    }
-    if (m_host.peripheral.adv_short_name_length > BLE_GAP_DEVICE_NAME_MAX_LEN)
-    {
-        m_host.peripheral.adv_short_name_length = BLE_GAP_DEVICE_NAME_MAX_LEN;
-    }
+    m_host.peripheral.adv_type = adv_type;
+    m_host.peripheral.adv_interval_ms = ((p_config != NULL) && (p_config->interval_ms != 0U))
+                                            ? p_config->interval_ms
+                                            : BLE_ADV_INTERVAL_MS_DEFAULT;
+    m_host.common.tx_power = m_host.peripheral.adv_data.tx_power_present
+                                 ? m_host.peripheral.adv_data.tx_power
+                                 : (m_host.peripheral.scan_response_data.tx_power_present
+                                        ? m_host.peripheral.scan_response_data.tx_power
+                                        : 0);
+    m_host.peripheral.service_count =
+        (m_host.peripheral.adv_data.service_uuid_present ||
+         m_host.peripheral.scan_response_data.service_uuid_present)
+            ? 1U
+            : 0U;
+    return true;
 }
 
 void ble_gap_scan_init(const ble_scan_config_t *p_config)
