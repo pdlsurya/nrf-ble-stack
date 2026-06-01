@@ -78,6 +78,8 @@ layers so packet flow is easy to follow in code.
   nRF radio peripheral abstraction used by the controller
 - `examples/peripheral_demo/`
   Example peripheral application using the stack
+- `examples/thermometer_adv_demo/`
+  Nonconnectable Health Thermometer service-data advertising example
 - `examples/central_demo/`
   Minimal central application that scans, connects, starts GATT discovery on
   `BLE_GAP_EVT_CONNECTED`, and subscribes while the stack performs automatic
@@ -120,46 +122,6 @@ See [nrf_ble.h](stack/include/nrf_ble.h),
 [ble_gatt_server.h](stack/include/ble_gatt_server.h), and
 [ble_gatt_client.h](stack/include/ble_gatt_client.h) for the full public
 interface.
-
-### Advertising Data
-
-`ble_adv_config_t` has separate `adv_data` and `scan_response_data` blocks.
-Each block can include a local name, TX power, one service UUID, service data,
-and manufacturer-specific data. Fields set to `NULL` are omitted.
-
-```c
-static uint8_t service_payload[] = { 0x01U, 0x00U };
-static const int8_t tx_power = 0x08;
-static const ble_uuid_t service_uuid = BLE_UUID_SIG16_INIT(0x1809U);
-static const ble_gap_adv_name_config_t short_name = {
-    .name_type = BLE_GAP_ADV_NAME_SHORT,
-    .short_name_length = 7U,
-};
-static const ble_gap_service_data_t service_data = {
-    .uuid = BLE_UUID_SIG16_INIT(0x1809U),
-    .p_data = service_payload,
-    .data_len = sizeof(service_payload),
-};
-static const ble_adv_config_t adv_config = {
-    .flags = (uint8_t)(BLE_GAP_ADV_FLAG_LE_GENERAL_DISC_MODE |
-                       BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED),
-    .interval_ms = 100U,
-    .adv_type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED,
-    .adv_data = {
-        .p_name = &short_name,
-        .p_tx_power = &tx_power,
-        .p_service_uuid = &service_uuid,
-        .p_service_data = &service_data,
-    },
-};
-```
-
-The stack copies advertising metadata during `ble_gap_adv_init()`, but service
-data and manufacturer-specific data payload pointers are retained. Applications
-can update those backing buffers between advertising events. The buffers must
-remain valid while the advertising configuration is active. If a configured AD
-structure does not fit in the selected legacy packet, the packet builder omits
-that structure.
 
 ## Architecture At A Glance
 
@@ -225,8 +187,14 @@ that structure.
 
 ## Example
 
-The repository includes working example applications in
-`examples/peripheral_demo` and `examples/central_demo`.
+The repository includes working example applications:
+
+- `examples/peripheral_demo`
+  Connectable GATT peripheral demo
+- `examples/thermometer_adv_demo`
+  Nonconnectable Health Thermometer service-data advertiser
+- `examples/central_demo`
+  Minimal central scanner and GATT client demo
 
 Before building the example, initialize the SDK submodule:
 
@@ -247,6 +215,12 @@ Build the peripheral example with:
 
 ```sh
 make -C examples/peripheral_demo -j4
+```
+
+Build the thermometer advertising example with:
+
+```sh
+make -C examples/thermometer_adv_demo -j4
 ```
 
 Build the central example with:
